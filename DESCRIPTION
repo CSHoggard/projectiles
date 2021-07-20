@@ -1,12 +1,12 @@
 Package: projectiles
-Title: What the Package Does (One Line, Title Case)
+Title: Exploratory Data Analysis: Middle Palaeolithic Projectiles
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Christian",
+           family = "Hoggard",
            role = c("aut", "cre"),
-           email = "first.last@example.com")
-Description: What the package does (one paragraph).
+           email = "C.S.Hoggard@soton.ac.uk")
+Description: Code and analyses for Milks et al. (in prep).
 License: MIT + file LICENSE
 ByteCompile: true
 Encoding: UTF-8
