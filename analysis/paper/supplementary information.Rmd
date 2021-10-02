@@ -1,6 +1,6 @@
 ---
 title: 'Supplementary Information: Milks et al. (2021)'
-author: "Dr. Christian Steven Hoggard"
+author: "Christian Steven Hoggard"
 date: "20/07/2021"
 output: pdf_document
 ---
@@ -9,22 +9,345 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Stage 1: Data importing and cleaning
 
-```{r cars}
-summary(cars)
+```{r}
+
+library(tidyverse)
+library(janitor)
+library(ggdist)
+library(gt)
+library(ggtext)
+library(extrafont)
+library(ggcorrplot)
+library(patchwork)
+library(reshape2)
+library(tidymodels)
+library(tidytext)
+
+data <- read_csv("https://raw.githubusercontent.com/CSHoggard/projectiles/main/analysis/data/raw_data/data.csv") %>%
+  clean_names()
+
+data_clean <- data %>%
+  select(-museum, -sample_id, -po_b_group, -provenance, -taper_design, -proximal_design) %>%
+  mutate(delivery = case_when(delivery == 1 ~ "Hand Thrown",
+                              delivery == 2 ~ "Thrust",
+                              delivery == 4 ~ "Unknown")) %>%
+  mutate(delivery = as.factor(delivery))
+
 ```
 
-## Including Plots
+```{r}
+data_clean %>%
+  summarise(`Length` = round(sd(length),2),
+            `Mass` = round(sd(mass),2),
+            `Diameter: 10` = round(sd(dia_10, na.rm = TRUE),2),
+            `Diameter: 100` = round(sd(dia_100, na.rm = TRUE),2),
+            `Diameter: 150` = round(sd(dia_150, na.rm = TRUE),2),
+            `Diameter: 200` = round(sd(dia_200),2),
+            `Diameter: 250` = round(sd(dia_250),2),
+            `Max Diameter` = round(sd(max_dia),2),
+            `Diameter: Mid-Point` = round(sd(dia_mid),2),
+            `LMD` = round(sd(lmd),2),
+            `POB` = round(sd(po_b),2)) %>% 
+  pivot_longer(cols = everything()) %>%
+  gt() %>%
+  tab_header(title = "Descriptive Statistics: Standard Deviation", subtitle = md("&nbsp;")) %>%
+  opt_align_table_header(align = "left")
 
-You can also embed plots, for example:
+data_clean %>%
+  summarise(`Length` = round((sd(length)/mean(length)*100),2),
+            `Mass` = round((sd(mass)/mean(mass)*100),2),
+            `Diameter: 10` = round((sd(dia_10, na.rm = TRUE)/mean(dia_10, na.rm = TRUE)*100),2),
+            `Diameter: 100` = round((sd(dia_100, na.rm = TRUE)/mean(dia_100, na.rm = TRUE)*100),2),
+            `Diameter: 150` = round((sd(dia_150, na.rm = TRUE)/mean(dia_150, na.rm = TRUE)*100),2),
+            `Diameter: 200` = round((sd(dia_200)/mean(dia_200)*100),2),
+            `Diameter: 250` = round((sd(dia_250)/mean(dia_250)*100),2),
+            `Max Diameter` = round((sd(max_dia)/mean(max_dia)*100),2),
+            `Diameter: Mid-Point` = round((sd(dia_mid)/mean(dia_mid)*100),2),
+            `LMD` = round((sd(lmd)/mean(lmd)*100),2),
+            `POB` = round((sd(po_b)/mean(po_b)*100),2)) %>% 
+  pivot_longer(cols = everything()) %>%
+  gt() %>%
+  tab_header(title = "Descriptive Statistics: Coefficient of Variation (CV)", subtitle = md("&nbsp;")) %>%
+  opt_align_table_header(align = "left")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+shapiro.test(data_clean$length)
+shapiro.test(data_clean$mass)
+shapiro.test(data_clean$dia_10)
+shapiro.test(data_clean$dia_100)
+shapiro.test(data_clean$dia_150)
+shapiro.test(data_clean$dia_200)
+shapiro.test(data_clean$dia_250)
+shapiro.test(data_clean$max_dia)
+shapiro.test(data_clean$dia_mid)
+shapiro.test(data_clean$lmd)
+shapiro.test(data_clean$po_b)
+```
+
+```{r}
+a <- data_clean %>%
+  ggplot(aes(length)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  theme_minimal() +
+  lims(x = c(0,5000),
+       y = c(-1,1)) +
+  labs(x = "Length (mm)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+b <- data_clean %>%
+  ggplot(aes(mass)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  lims(x = c(0,2500),
+       y = c(-1,1)) +
+  theme_minimal() +
+  labs(x = "Mass (g)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+c <- data_clean %>%
+  ggplot(aes(max_dia)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  lims(x = c(0,40),
+       y = c(-2.5,1)) +
+  theme_minimal() +
+  labs(x = "Max Diameter (mm)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+d <- data_clean %>%
+  ggplot(aes(dia_mid)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  lims(x = c(0,40),
+       y = c(-2.5,1)) +
+  theme_minimal() +
+  labs(x = "Diameter at Midpoint (mm)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+e <- data_clean %>%
+  ggplot(aes(lmd)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  lims(x = c(0,2500),
+       y = c(-2,1)) +
+  theme_minimal() +
+  labs(x = "Location of Midpoint (mm)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+f <- data_clean %>%
+  ggplot(aes(po_b)) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
+  lims(x = c(0,2500),
+       y = c(-1,1)) +
+  theme_minimal() +
+  labs(x = "Point of Balance (mm)") +
+  theme(text = element_text(family = "Lato", size = 10),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.x = element_text(margin = margin(5,0,0,0)))
+
+a / b / c / d / e / f
+
+```
+
+```{r}
+
+get_lower_tri<-function(cormat){
+    cormat[upper.tri(cormat)] <- NA
+    return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+data_clean %>%
+  select(length, max_dia, lmd, po_b, dia_10, dia_50, dia_100, dia_150, dia_200,
+         dia_250, dia_300, dia_800, dia_mid, mass) %>% 
+  cor(use = "complete.obs") %>%
+  round(2) %>%
+  reorder_cormat() %>%
+  get_lower_tri() %>%
+  melt(na.rm = TRUE) %>%
+  ggplot(aes(Var1, Var2, fill = value)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(Var1, Var2, label = value), family = "Lato", color = "black", size = 3) +
+  labs(caption = "Abbreviations: dia_mid (Diameter at Mid-point) | dia_x (Diameter at X Measurement) \n po_b (Point of Balance) | lmd (Length at Maximum Diameter) | max_dia (Maximum Diameter)") + 
+  coord_fixed() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab")+
+  theme_minimal() +
+  theme(text = element_text(family = "Lato", size = 10),
+        plot.caption = element_text(size = 8, colour = "grey30", hjust = 0.5, margin = margin(10,0,0,0)),
+        legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank())
+
+
+```
+
+```{r}
+
+data_recipe <- 
+  recipe(~., data = data_clean) %>%
+  update_role(museum_id, delivery, new_role = "id") %>% 
+  step_naomit(all_predictors()) %>% 
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), id = "pca") %>% 
+  prep()
+  
+data_pca <- 
+  data_recipe %>% 
+  tidy(id = "pca") 
+
+```
+
+```{r}
+data_recipe %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#b6dfe2") + 
+  geom_text(aes(component, value + 3, label = scales::percent(round(value/100, 3))), family = "Lato", color = "grey40", size = 4) +
+  xlab("Principal Component") +
+  ylab("Variance (%)") +
+  xlim(c(0.5, 5.5)) +
+  theme_minimal() +
+    theme(text = element_text(family = "Lato", size = 10),
+          plot.margin = margin(5, 5, 5, 5),
+          axis.title.x = element_text(size = 11, color = "grey20", margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, color = "grey20", margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+```
+
+```{r}
+data_pca %>%
+  mutate(value = value * 100) %>%
+  mutate(terms = tidytext::reorder_within(terms, 
+                                          abs(value), 
+                                          component)) %>%
+  group_by(component) %>%
+  top_n(abs(value), n = 8) %>%
+  filter(component %in% c("PC1", "PC2", "PC3", "PC4")) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  labs(
+    x = "Contribution (%)",
+    y = "Variable (Top 8)", 
+    fill = "Value Direction"
+  ) +
+  scale_fill_manual(values = c("#b6dfe2", "#0A537D"),
+                    labels = c("Negative", "Positive")) +
+  theme_minimal() +
+    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+          plot.margin = margin(5, 5, 5, 5),
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          strip.text.x = element_text(size = 14, margin = margin(5,0,10,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+```
+
+```{r}
+pca_wider <- data_pca %>% 
+  tidyr::pivot_wider(names_from = component, id_cols = terms)
+
+arrow_style <- arrow(length = unit(.05, "inches"),
+                     type = "closed")
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC1, PC2, colour = Delivery, shape = Delivery)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 1 (44.6%)",
+       y = "Principal Component 2 (30.8%)") +
+  scale_colour_manual(values = c("darkorange","purple","cyan4")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC2, PC3, colour = Delivery, shape = Delivery)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 2 (30.8%)",
+       y = "Principal Component 3 (10.0%)") +
+  scale_colour_manual(values = c("darkorange","purple","cyan4")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+```
