@@ -1,7 +1,9 @@
 ---
 title: 'Supplementary Information: Milks et al. (2021)'
-author: "Christian Steven Hoggard"
-date: "20/07/2021"
+author: 
+- Annemieke Milks
+- Christian Steven Hoggard
+date: "`r format(Sys.time(), '%B %Y')`"
 output: pdf_document
 ---
 
@@ -9,16 +11,14 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Introduction
-
-
-## Stage 1: Data importing and cleaning
 
 ```{r}
 
 library(tidyverse)
 library(janitor)
 library(ggdist)
+library(skimr)
+library(e1071)
 library(gt)
 library(ggtext)
 library(extrafont)
@@ -36,44 +36,43 @@ data_clean <- data %>%
   mutate(delivery = case_when(delivery == 1 ~ "Hand Thrown",
                               delivery == 2 ~ "Thrust",
                               delivery == 4 ~ "Unknown")) %>%
-  mutate(delivery = as.factor(delivery))
+  mutate(delivery = as.factor(delivery)) %>%
+  mutate(proposed_grouping = if_else(percent_po_b < 50, "Group 1", "Group 2")) %>%
+  mutate(proposed_grouping_2 = if_else(delivery == "Thrust", "Thrust", proposed_grouping))
 
 ```
 
 ```{r}
-data_clean %>%
-  summarise(`Length` = round(sd(length),2),
-            `Mass` = round(sd(mass),2),
-            `Diameter: 10` = round(sd(dia_10, na.rm = TRUE),2),
-            `Diameter: 100` = round(sd(dia_100, na.rm = TRUE),2),
-            `Diameter: 150` = round(sd(dia_150, na.rm = TRUE),2),
-            `Diameter: 200` = round(sd(dia_200),2),
-            `Diameter: 250` = round(sd(dia_250),2),
-            `Max Diameter` = round(sd(max_dia),2),
-            `Diameter: Mid-Point` = round(sd(dia_mid),2),
-            `LMD` = round(sd(lmd),2),
-            `POB` = round(sd(po_b),2)) %>% 
-  pivot_longer(cols = everything()) %>%
-  gt() %>%
-  tab_header(title = "Descriptive Statistics: Standard Deviation", subtitle = md("&nbsp;")) %>%
-  opt_align_table_header(align = "left")
+
+my_skim <- skim_with(numeric = sfl("skewness" = skewness,
+                                   "kurtosis" = kurtosis,
+                                   "max" = max,
+                                   "min" = min,
+                                   "median" = median,
+                                   hist = NULL))
 
 data_clean %>%
-  summarise(`Length` = round((sd(length)/mean(length)*100),2),
-            `Mass` = round((sd(mass)/mean(mass)*100),2),
-            `Diameter: 10` = round((sd(dia_10, na.rm = TRUE)/mean(dia_10, na.rm = TRUE)*100),2),
-            `Diameter: 100` = round((sd(dia_100, na.rm = TRUE)/mean(dia_100, na.rm = TRUE)*100),2),
-            `Diameter: 150` = round((sd(dia_150, na.rm = TRUE)/mean(dia_150, na.rm = TRUE)*100),2),
-            `Diameter: 200` = round((sd(dia_200)/mean(dia_200)*100),2),
-            `Diameter: 250` = round((sd(dia_250)/mean(dia_250)*100),2),
-            `Max Diameter` = round((sd(max_dia)/mean(max_dia)*100),2),
-            `Diameter: Mid-Point` = round((sd(dia_mid)/mean(dia_mid)*100),2),
-            `LMD` = round((sd(lmd)/mean(lmd)*100),2),
-            `POB` = round((sd(po_b)/mean(po_b)*100),2)) %>% 
-  pivot_longer(cols = everything()) %>%
-  gt() %>%
-  tab_header(title = "Descriptive Statistics: Coefficient of Variation (CV)", subtitle = md("&nbsp;")) %>%
-  opt_align_table_header(align = "left")
+  select(-delivery, -museum_id, -proposed_grouping, -proposed_grouping_2) %>%
+  pivot_longer(everything()) %>%
+  group_by(name) %>%
+  na.omit() %>%
+  my_skim() %>%
+  select(-skim_variable, -skim_type, -n_missing, -complete_rate, -numeric.p0, -numeric.p100) %>%
+  rename("variable" = "name",
+         "mean" = "numeric.mean",
+         "sd" = "numeric.sd",
+         "p25" = "numeric.p25",
+         "p50" = "numeric.p50",
+         "p75" = "numeric.p75",
+         "skewness" = "numeric.skewness",
+         "kurtosis" = "numeric.kurtosis",
+         "max" = "numeric.max",
+         "min" = "numeric.min",
+         "median" = "numeric.median") %>%
+  select(variable, min, max, median, mean, sd, p25, p75, kurtosis, skewness) %>%
+  mutate_at(2:10, round, 1) 
+
+# Optional GT view with %>%  gt()
 
 ```
 
@@ -88,19 +87,20 @@ shapiro.test(data_clean$dia_250)
 shapiro.test(data_clean$max_dia)
 shapiro.test(data_clean$dia_mid)
 shapiro.test(data_clean$lmd)
-shapiro.test(data_clean$po_b)
+shapiro.test(data_clean$percent_po_b)
+
 ```
 
 ```{r}
 a <- data_clean %>%
   ggplot(aes(length)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   theme_minimal() +
   lims(x = c(0,5000),
        y = c(-1,1)) +
   labs(x = "Length (mm)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -109,13 +109,13 @@ a <- data_clean %>%
 
 b <- data_clean %>%
   ggplot(aes(mass)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   lims(x = c(0,2500),
        y = c(-1,1)) +
   theme_minimal() +
   labs(x = "Mass (g)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -124,13 +124,13 @@ b <- data_clean %>%
 
 c <- data_clean %>%
   ggplot(aes(max_dia)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   lims(x = c(0,40),
        y = c(-2.5,1)) +
   theme_minimal() +
   labs(x = "Max Diameter (mm)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -139,13 +139,13 @@ c <- data_clean %>%
 
 d <- data_clean %>%
   ggplot(aes(dia_mid)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   lims(x = c(0,40),
        y = c(-2.5,1)) +
   theme_minimal() +
   labs(x = "Diameter at Midpoint (mm)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -154,13 +154,13 @@ d <- data_clean %>%
 
 e <- data_clean %>%
   ggplot(aes(lmd)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
-  lims(x = c(0,2500),
+  lims(x = c(0,5000),
        y = c(-2,1)) +
   theme_minimal() +
   labs(x = "Location of Midpoint (mm)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -169,20 +169,20 @@ e <- data_clean %>%
 
 f <- data_clean %>%
   ggplot(aes(po_b)) +
-  stat_slab(scale = 0.6, position = "dodge", slab_fill = "orange", slab_colour = "orange", alpha = 0.6) +
+  stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
-  lims(x = c(0,2500),
+  lims(x = c(0,5000),
        y = c(-1,1)) +
   theme_minimal() +
   labs(x = "Point of Balance (mm)") +
-  theme(text = element_text(family = "Lato", size = 10),
+  theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         axis.title.x = element_text(margin = margin(5,0,0,0)))
 
-a / b / c / d / e / f
+b / a / e / f / c / d  & theme(plot.margin = margin(10,20,10,20))
 
 ```
 
@@ -204,20 +204,20 @@ data_clean %>%
          dia_250, dia_300, dia_800, dia_mid, mass) %>% 
   cor(use = "complete.obs") %>%
   round(2) %>%
-  reorder_cormat() %>%
   get_lower_tri() %>%
   melt(na.rm = TRUE) %>%
   ggplot(aes(Var1, Var2, fill = value)) +
   geom_tile(colour = "white") +
-  geom_text(aes(Var1, Var2, label = value), family = "Lato", color = "black", size = 3) +
-  labs(caption = "Abbreviations: dia_mid (Diameter at Mid-point) | dia_x (Diameter at X Measurement) \n po_b (Point of Balance) | lmd (Length at Maximum Diameter) | max_dia (Maximum Diameter)") + 
+  geom_text(aes(Var1, Var2, label = value), family = "Roboto", color = "black", size = 3.5) +
+  labs(fill = NULL, caption = "<b>Abbreviations</b>: <b>dia_mid</b> (diameter at mid-point) | <b>dia_x</b> (diameter at X measurement) <b>po_b</b> (point of balance)<br> <b>lmd</b> (length at maximum diameter) | <b>max_dia</b> (maximum diameter)") + 
   coord_fixed() +
   scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
                        midpoint = 0, limit = c(-1,1), space = "Lab")+
   theme_minimal() +
-  theme(text = element_text(family = "Lato", size = 10),
-        plot.caption = element_text(size = 8, colour = "grey30", hjust = 0.5, margin = margin(10,0,0,0)),
-        legend.position = "none",
+  theme(plot.margin = margin(10,10,10,10),
+        text = element_text(family = "Roboto", size = 10),
+        plot.caption = element_markdown(size = 9, colour = "grey30", hjust = 0.5, margin = margin(20,0,0,0)),
+        legend.position = "top",
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.major = element_blank(),
@@ -232,7 +232,7 @@ data_clean %>%
 
 data_recipe <- 
   recipe(~., data = data_clean) %>%
-  update_role(museum_id, delivery, new_role = "id") %>% 
+  update_role(museum_id, delivery, proposed_grouping, proposed_grouping_2, new_role = "id") %>% 
   step_naomit(all_predictors()) %>% 
   step_normalize(all_predictors()) %>%
   step_pca(all_predictors(), id = "pca") %>% 
@@ -247,17 +247,18 @@ data_pca <-
 ```{r}
 data_recipe %>% 
   tidy(id = "pca", type = "variance") %>% 
-  filter(terms == "percent variance") %>% 
+  filter(terms == "percent variance") %>%
+  filter(component < 8) %>% 
   ggplot(aes(x = component, y = value)) + 
   geom_col(fill = "#b6dfe2") + 
-  geom_text(aes(component, value + 3, label = scales::percent(round(value/100, 3))), family = "Lato", color = "grey40", size = 4) +
+  geom_text(aes(component, value + 1.5, label = scales::percent(round(value/100, 2))), family = "Roboto Black", color = "grey40", size = 4) +
   xlab("Principal Component") +
   ylab("Variance (%)") +
-  xlim(c(0.5, 5.5)) +
+  scale_x_continuous(breaks = seq(0,8,1)) +
   theme_minimal() +
-    theme(text = element_text(family = "Lato", size = 10),
-          plot.margin = margin(5, 5, 5, 5),
-          axis.title.x = element_text(size = 11, color = "grey20", margin = margin(10,0,0,0)),
+    theme(text = element_text(family = "Roboto", size = 10),
+          plot.margin = margin(10, 5, 10, 5),
+          axis.title.x = element_text(size = 14, color = "grey20", margin = margin(10,0,0,0)),
           axis.title.y = element_text(size = 11, color = "grey20", margin = margin(0,10,0,0)),
           panel.grid.major = element_blank(),
           panel.border = element_blank(),
@@ -281,12 +282,12 @@ data_pca %>%
   labs(
     x = "Contribution (%)",
     y = "Variable (Top 8)", 
-    fill = "Value Direction"
+    fill = "PCA Direction"
   ) +
   scale_fill_manual(values = c("#b6dfe2", "#0A537D"),
                     labels = c("Negative", "Positive")) +
   theme_minimal() +
-    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
           plot.margin = margin(5, 5, 5, 5),
           axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
           axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
@@ -312,14 +313,16 @@ data_recipe %>%
   stat_ellipse(type = "norm") +
   labs(x = "Principal Component 1 (44.6%)",
        y = "Principal Component 2 (30.8%)") +
-  scale_colour_manual(values = c("darkorange","purple","cyan4")) +
+  scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
   coord_fixed() +
   theme_minimal() +
-    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
           plot.margin = margin(10, 10, 10, 10),
           legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
           axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
           axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
           panel.grid.major = element_blank(),
@@ -335,19 +338,141 @@ data_recipe %>%
   stat_ellipse(type = "norm") +
   labs(x = "Principal Component 2 (30.8%)",
        y = "Principal Component 3 (10.0%)") +
-  scale_colour_manual(values = c("darkorange","purple","cyan4")) +
+  scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
   coord_fixed() +
   theme_minimal() +
-    theme(text = element_text(family = "Lato", size = 10, colour = "grey20"),
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
           plot.margin = margin(10, 10, 10, 10),
           legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
           axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
           axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
           panel.grid.major = element_blank(),
           panel.border = element_blank(),
           panel.background = element_blank(),
           axis.ticks = element_blank())
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC1, PC2, colour = proposed_grouping, shape = proposed_grouping)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 1 (44.6%)",
+       y = "Principal Component 2 (30.8%)") +
+  scale_colour_manual(values = c("#b6dfe2","#0A537D")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC2, PC3, colour = proposed_grouping, shape = proposed_grouping)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 2 (30.8%)",
+       y = "Principal Component 3 (10.0%)") +
+  scale_colour_manual(values = c("#b6dfe2","#0A537D")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC1, PC2, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 1 (44.6%)",
+       y = "Principal Component 2 (30.8%)") +
+  scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  ggplot(aes(PC2, PC3, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
+  geom_point(alpha = 0.8, size = 2) +
+  stat_ellipse(type = "norm") +
+  labs(x = "Principal Component 2 (30.8%)",
+       y = "Principal Component 3 (10.0%)") +
+  scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
+  lims(x = c(-10,10),
+       y = c(-10,10)) +
+  coord_fixed() +
+  theme_minimal() +
+    theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text  = element_text(size = 11),
+          axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
+          axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
+          panel.grid.major = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank())
+
+```
+
+```{r}
+
+PCA_data <- data_recipe %>%
+  juice() %>%
+  dplyr::rename(Delivery = delivery) %>%
+  select(-museum_id) 
+
+
+res.man <- manova(cbind(PC1, PC2, PC3, PC4, PC5) ~ Delivery, data = PCA_data)
+summary(res.man)
+
+summary.aov(res.man)
+
+res.man.2 <- manova(cbind(PC1, PC2, PC3, PC4, PC5) ~ proposed_grouping, data = PCA_data)
+summary(res.man.2)
+
+summary.aov(res.man.2)
 
 ```
