@@ -70,9 +70,8 @@ data_clean %>%
          "min" = "numeric.min",
          "median" = "numeric.median") %>%
   select(variable, min, max, median, mean, sd, p25, p75, kurtosis, skewness) %>%
-  mutate_at(2:10, round, 1) 
-
-# Optional GT view with %>%  gt()
+  mutate_at(2:10, round, 1) %>%
+  mutate(cv = round((sd/mean) * 100, 1)) %>%  gt() 
 
 ```
 
@@ -216,6 +215,7 @@ data_clean %>%
   theme_minimal() +
   theme(plot.margin = margin(10,10,10,10),
         text = element_text(family = "Roboto", size = 10),
+        plot.background = element_rect(colour = "#FFFFFF"),
         plot.caption = element_markdown(size = 9, colour = "grey30", hjust = 0.5, margin = margin(20,0,0,0)),
         legend.position = "top",
         axis.title.x = element_blank(),
@@ -259,6 +259,8 @@ data_recipe %>%
     theme(text = element_text(family = "Roboto", size = 10),
           plot.margin = margin(10, 5, 10, 5),
           axis.title.x = element_text(size = 14, color = "grey20", margin = margin(10,0,0,0)),
+          axis.text = element_text(size = 11, colour = "grey40"),
+          plot.background = element_rect(colour = "#FFFFFF"),
           axis.title.y = element_text(size = 11, color = "grey20", margin = margin(0,10,0,0)),
           panel.grid.major = element_blank(),
           panel.border = element_blank(),
@@ -288,10 +290,13 @@ data_pca %>%
                     labels = c("Negative", "Positive")) +
   theme_minimal() +
     theme(text = element_text(family = "Roboto", size = 10, colour = "grey20"),
-          plot.margin = margin(5, 5, 5, 5),
+          plot.margin = margin(10, 10, 10, 10),
+          legend.text = element_text(size = 10),
+          plot.background = element_rect(colour = "#FFFFFF"),
           axis.title.x = element_text(size = 11, margin = margin(10,0,0,0)),
           axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
           strip.text.x = element_text(size = 14, margin = margin(5,0,10,0)),
+          axis.text = element_text(size = 10, colour = "grey40"),
           panel.grid.major = element_blank(),
           panel.border = element_blank(),
           panel.background = element_blank(),
@@ -299,13 +304,7 @@ data_pca %>%
 ```
 
 ```{r}
-pca_wider <- data_pca %>% 
-  tidyr::pivot_wider(names_from = component, id_cols = terms)
-
-arrow_style <- arrow(length = unit(.05, "inches"),
-                     type = "closed")
-
-data_recipe %>%
+a <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC1, PC2, colour = Delivery, shape = Delivery)) +
@@ -330,7 +329,7 @@ data_recipe %>%
           panel.background = element_blank(),
           axis.ticks = element_blank())
 
-data_recipe %>%
+b <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC2, PC3, colour = Delivery, shape = Delivery)) +
@@ -355,7 +354,7 @@ data_recipe %>%
           panel.background = element_blank(),
           axis.ticks = element_blank())
 
-data_recipe %>%
+c <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC1, PC2, colour = proposed_grouping, shape = proposed_grouping)) +
@@ -380,7 +379,7 @@ data_recipe %>%
           panel.background = element_blank(),
           axis.ticks = element_blank())
 
-data_recipe %>%
+d <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC2, PC3, colour = proposed_grouping, shape = proposed_grouping)) +
@@ -405,7 +404,7 @@ data_recipe %>%
           panel.background = element_blank(),
           axis.ticks = element_blank())
 
-data_recipe %>%
+e <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC1, PC2, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
@@ -430,7 +429,7 @@ data_recipe %>%
           panel.background = element_blank(),
           axis.ticks = element_blank())
 
-data_recipe %>%
+f <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
   ggplot(aes(PC2, PC3, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
@@ -454,6 +453,12 @@ data_recipe %>%
           panel.border = element_blank(),
           panel.background = element_blank(),
           axis.ticks = element_blank())
+
+a + b
+
+c + d
+
+e + f
 
 ```
 
