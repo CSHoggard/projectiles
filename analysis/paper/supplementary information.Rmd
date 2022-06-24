@@ -91,6 +91,45 @@ shapiro.test(data_clean$percent_po_b)
 ```
 
 ```{r}
+data_clean %>%
+  ggplot(aes(x = max_dia, fill = delivery)) +
+  geom_histogram(bins = 20, colour = "#FFFFFF") +
+  labs(x = "Maximum Diameter",
+       y = "Frequency") +
+  facet_wrap(~delivery, ncol = 1) +
+  scale_fill_manual(values = c("#0A537D", "#7d340a", "#b6dfe2"))+
+  theme_minimal() + 
+  theme(legend.position = "none",
+        plot.margin = margin(10,20,10,20),
+        plot.background = element_rect(colour = "#FFFFFF"),
+        text = element_text(family = "Roboto", size = 11), 
+        strip.text.x = element_text(size = 12, face = "bold", margin = margin(10,0,20,0)),
+        axis.title.x = element_text(size = 12, margin = margin(10,0,10,0)),
+        axis.title.y = element_text(size = 12, margin = margin(0,20,0,0)))
+
+```
+
+```{r}
+data_clean %>%
+  ggplot(aes(percent_po_b, percent_lmd, fill = delivery)) +
+  geom_point(size = 4, pch = 21, colour = "#FFFFFF") +
+  labs(x = "Point of Balance (%)",
+       y = "Location of Maximum Diameter (%)") +
+  scale_fill_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
+  lims(x = c(30, 60),
+       y = c(0, 70)) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.margin = margin(25,25,15,25),
+        plot.background = element_rect(colour = "#FFFFFF"),
+        text = element_text(family = "Roboto", size = 11), 
+        axis.title.x = element_text(size = 12, margin = margin(20,0,5,0)),
+        axis.title.y = element_text(size = 12, margin = margin(0,20,0,0)))
+
+```
+
+```{r}
 a <- data_clean %>%
   ggplot(aes(length)) +
   stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
@@ -158,7 +197,7 @@ e <- data_clean %>%
   lims(x = c(0,5000),
        y = c(-2,1)) +
   theme_minimal() +
-  labs(x = "Location of Midpoint (mm)") +
+  labs(x = "Location of Maximum Diameter (mm)") +
   theme(text = element_text(family = "Roboto", size = 10),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
@@ -181,7 +220,7 @@ f <- data_clean %>%
         panel.grid.major.y = element_blank(),
         axis.title.x = element_text(margin = margin(5,0,0,0)))
 
-b / a / e / f / c / d  & theme(plot.margin = margin(10,20,10,20))
+b / a / f / e / c / d  & theme(plot.margin = margin(10,20,10,20))
 
 ```
 
