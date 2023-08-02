@@ -1,5 +1,5 @@
 ---
-title: 'Supplementary Information: Milks et al. (2021)'
+title: 'Supplementary Information: Milks et al. (2023)'
 author: 
 - Annemieke Milks
 - Christian Steven Hoggard
@@ -27,22 +27,25 @@ library(reshape2)
 library(tidymodels)
 library(tidytext)
 library(rstatix)
+library(ggdist)
 
 # install.packages("remotes")
 # remotes::install_github("teunbrand/ggh4x")
+
 library(ggh4x)
 
-data <- read_csv("https://raw.githubusercontent.com/CSHoggard/projectiles/main/analysis/data/raw_data/data.csv") %>%
+data <- read_csv("Ethno_Spears_data_Revised.csv", skip = 1) %>%
   clean_names()
 
 data_clean <- data %>%
-  select(-museum, -sample_id, -po_b_group, -provenance, -taper_design, -proximal_design) %>%
+  select(-museum, -sample_id, -provenance, -taper_design, -proximal_design) %>%
   mutate(delivery = case_when(delivery == 1 ~ "Hand Thrown",
                               delivery == 2 ~ "Thrust",
                               delivery == 4 ~ "Unknown")) %>%
   mutate(delivery = as.factor(delivery)) %>%
   mutate(proposed_grouping = if_else(percent_po_b < 50, "Group 1", "Group 2")) %>%
-  mutate(proposed_grouping_2 = if_else(delivery == "Thrust", "Thrust", proposed_grouping))
+  mutate(proposed_grouping_2 = if_else(delivery == "Thrust", "Thrust", proposed_grouping)) %>%
+  select(-filter, -r_ranked_p, -r_ranked_p_mean, -ind_diff_po_b, -r_mass, -r_mass_mean, -ind_diff_mass)
 
 ```
 
@@ -52,14 +55,13 @@ my_skim <- skim_with(numeric = sfl("skewness" = skewness,
                                    "kurtosis" = kurtosis,
                                    "max" = max,
                                    "min" = min,
-                                   "median" = median,
-                                   hist = NULL))
+                                   "median" = median))
 
 data_clean %>%
   select(-delivery, -museum_id, -proposed_grouping, -proposed_grouping_2) %>%
   pivot_longer(everything()) %>%
-  group_by(name) %>%
   na.omit() %>%
+  group_by(name) %>%
   my_skim() %>%
   select(-skim_variable, -skim_type, -n_missing, -complete_rate, -numeric.p0, -numeric.p100) %>%
   rename("variable" = "name",
@@ -75,7 +77,8 @@ data_clean %>%
          "median" = "numeric.median") %>%
   select(variable, min, max, median, mean, sd, p25, p75, kurtosis, skewness) %>%
   mutate_at(2:10, round, 1) %>%
-  mutate(cv = round((sd/mean) * 100, 1)) %>%  gt() 
+  mutate(cv = round((sd/mean) * 100, 1)) %>%  
+  gt() 
 
 data_clean %>%
   filter(delivery == "Hand Thrown") %>%
@@ -121,9 +124,10 @@ data_clean %>%
          "median" = "numeric.median") %>%
   select(variable, min, max, median, mean, sd, p25, p75, kurtosis, skewness) %>%
   mutate_at(2:10, round, 1) %>%
-  mutate(cv = round((sd/mean) * 100, 1)) %>%  gt() 
+  mutate(cv = round((sd/mean) * 100, 1)) %>%  
+  gt() 
   
-a <- data_clean %>%
+data_clean %>%
   filter(delivery == "Unknown") %>%
   select(-delivery, -museum_id, -proposed_grouping, -proposed_grouping_2) %>%
   pivot_longer(everything()) %>%
@@ -177,17 +181,20 @@ data_clean %>%
         axis.title.x = element_text(size = 12, margin = margin(10,0,10,0)),
         axis.title.y = element_text(size = 12, margin = margin(0,20,0,0)))
 
+ggsave("Figure_2.png", plot = last_plot(), dpi = 400, bg = "white", height = 20, width = 20, units = "cm")
+
 ```
 
 ```{r}
 data_clean %>%
-  ggplot(aes(percent_po_b, percent_lmd, fill = delivery)) +
+  ggplot(aes(percent_po_b, percent_loc_max_dia, fill = delivery)) +
   geom_point(size = 4, pch = 21, colour = "#FFFFFF") +
   labs(x = "Point of Balance (%)",
        y = "Location of Maximum Diameter (%)") +
   scale_fill_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(30, 60),
        y = c(0, 70)) +
+  scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   theme_minimal() +
   theme(legend.position = "bottom",
         legend.title = element_blank(),
@@ -196,6 +203,8 @@ data_clean %>%
         text = element_text(family = "Roboto", size = 11), 
         axis.title.x = element_text(size = 12, margin = margin(20,0,5,0)),
         axis.title.y = element_text(size = 12, margin = margin(0,20,0,0)))
+
+ggsave("Figure_5.png", plot = last_plot(), dpi = 400, bg = "white", height = 20, width = 20, units = "cm")
 
 ```
 
@@ -207,7 +216,7 @@ data_clean %>%
   mutate(metric = case_when(
     metric == "length" ~ "Length (mm)",
     metric == "max_dia" ~ "Max. Dia. (mm)",
-    metric == "lmd" ~ "Length at Max. Dia. (mm)",
+    metric == "loc_max_dia" ~ "Location of Max. Dia. (mm)",
     metric == "po_b" ~ "Point of Balance (mm)",
     metric == "dia_10" ~ "Dia. at 10mm (mm)",
     metric == "dia_50" ~ "Dia. at 50mm (mm)",
@@ -217,14 +226,14 @@ data_clean %>%
     metric == "dia_250" ~ "Dia. at 250mm (mm)",
     metric == "dia_300" ~ "Dia. at 300mm (mm)",
     metric == "dia_800" ~ "Dia. at 800mm (mm)",
-    metric == "dia_mid" ~ "Dia. at Midpoint (mm)",
+    metric == "dia_middle" ~ "Dia. at Midpoint (mm)",
     metric == "mass" ~ "Mass (g)",
-    metric == "percent_lmd" ~ "Location at Max. Dia. (%)",
+    metric == "percent_loc_max_dia" ~ "Location of Max. Dia.",
     metric == "percent_po_b" ~ "Point of Balance (%)",
     TRUE ~ metric
   )) %>%
   mutate(metric = as.factor(metric)) %>%
-  mutate(metric = fct_relevel(metric, c("Length (mm)", "Max. Dia. (mm)", "Length at Max. Dia. (mm)", "Point of Balance (mm)", "Dia. at 10mm (mm)", "Dia. at 50mm (mm)", "Dia. at 100mm (mm)", "Dia. at 150mm (mm)", "Dia. at 200mm (mm)", "Dia. at 250mm (mm)", "Dia. at 300mm (mm)", "Dia. at 800mm (mm)", "Dia. at Midpoint (mm)", "Mass (g)", "Location at Max. Dia. (%)", "Point of Balance (%)"))) %>%
+  mutate(metric = fct_relevel(metric, c("Length (mm)", "Max. Dia. (mm)", "Location of Max. Dia. (mm)", "Point of Balance (mm)", "Dia. at 10mm (mm)", "Dia. at 50mm (mm)", "Dia. at 100mm (mm)", "Dia. at 150mm (mm)", "Dia. at 200mm (mm)", "Dia. at 250mm (mm)", "Dia. at 300mm (mm)", "Dia. at 800mm (mm)", "Dia. at Midpoint (mm)", "Mass (g)", "Location of Max. Dia.", "Point of Balance (%)"))) %>%
   ggplot(aes(metric, value)) +
   geom_jitter(aes(fill = delivery, colour = delivery), size = 2, alpha = 0.2, position = position_dodge(width = 1)) +
   geom_boxplot(aes(fill = delivery, colour = delivery), na.rm = TRUE, width = 0.5, position = position_dodge(width = 1)) + 
@@ -233,7 +242,7 @@ data_clean %>%
     y = list(
       metric == "Length (mm)" ~ scale_y_continuous(limits = c(0,5000)),
       metric == "Max. Dia. (mm)" ~ scale_y_continuous(limits = c(0,40)),
-      metric == "Length at Max. Dia. (mm)" ~ scale_y_continuous(limits = c(0,3000)),
+      metric == "Location of Max. Dia. (mm)" ~ scale_y_continuous(limits = c(0,3000)),
       metric == "Point of Balance (mm)" ~ scale_y_continuous(limits = c(0,3000)),
       metric == "Dia. at 10mm (mm)" ~ scale_y_continuous(limits = c(0,30)),
       metric == "Dia. at 50mm (mm)" ~ scale_y_continuous(limits = c(0,30)),
@@ -245,7 +254,7 @@ data_clean %>%
       metric == "Dia. at 800mm (mm)" ~ scale_y_continuous(limits = c(0,30)),
       metric == "Dia. at Midpoint (mm)" ~ scale_y_continuous(limits = c(0,30)),
       metric == "Mass (g)" ~ scale_y_continuous(limits = c(0,2500)),
-      metric == "Location at Max. Dia. (%)" ~ scale_y_continuous(limits = c(0,100)),
+      metric == "Location of Max. Dia." ~ scale_y_continuous(limits = c(0,100)),
       metric == "Point of Balance (%)" ~ scale_y_continuous(limits = c(0,100))
     )
   ) +
@@ -262,6 +271,8 @@ data_clean %>%
         axis.text.y = element_text(size = 7),
         axis.text.x = element_blank(),
         strip.text.x = element_text(size = 9))
+
+ggsave("Figure_1.png", plot = last_plot(), dpi = 400, bg = "white", height = 25, width = 25, units = "cm")
 ```
 
 ```{r}
@@ -272,9 +283,9 @@ aov.data <- data_clean %>%
   droplevels()
 
 
-aov.results <- aov(length + max_dia + lmd + percent_lmd + po_b + percent_po_b + 
+aov.results <- aov(length + max_dia + loc_max_dia + percent_loc_max_dia + po_b + percent_po_b + 
       dia_10 + dia_50 + dia_100 + dia_150 + dia_200 + dia_250 + dia_300 + 
-      dia_800 + dia_mid + mass ~ delivery, data = aov.data)
+      dia_800 + dia_middle + mass ~ delivery, data = aov.data)
 
 
 summary(aov.results)
@@ -289,11 +300,11 @@ t2 <- data_clean %>%
 
 t3 <- data_clean %>%
   select(-museum_id, -proposed_grouping, -proposed_grouping_2) %>%
-  pairwise_t_test(lmd ~ delivery , p.adjust.method = "bonferroni")
+  pairwise_t_test(loc_max_dia ~ delivery , p.adjust.method = "bonferroni")
 
 t4 <- data_clean %>%
   select(-museum_id, -proposed_grouping, -proposed_grouping_2) %>%
-  pairwise_t_test(percent_lmd ~ delivery , p.adjust.method = "bonferroni")
+  pairwise_t_test(percent_loc_max_dia ~ delivery , p.adjust.method = "bonferroni")
 
 t5 <- data_clean %>%
   select(-museum_id, -proposed_grouping, -proposed_grouping_2) %>%
@@ -337,7 +348,7 @@ t14 <- data_clean %>%
 
 t15 <- data_clean %>%
   select(-museum_id, -proposed_grouping, -proposed_grouping_2) %>%
-  pairwise_t_test(dia_mid ~ delivery , p.adjust.method = "bonferroni")
+  pairwise_t_test(dia_middle ~ delivery , p.adjust.method = "bonferroni")
 
 t16 <- data_clean %>%
   select(-museum_id, -proposed_grouping, -proposed_grouping_2) %>%
@@ -440,7 +451,7 @@ c <- data_clean %>%
         axis.title.x = element_text(margin = margin(5,0,0,0)))
 
 d <- data_clean %>%
-  ggplot(aes(dia_mid)) +
+  ggplot(aes(dia_middle)) +
   stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   lims(x = c(0,40),
@@ -455,7 +466,7 @@ d <- data_clean %>%
         axis.title.x = element_text(margin = margin(5,0,0,0)))
 
 e <- data_clean %>%
-  ggplot(aes(lmd)) +
+  ggplot(aes(loc_max_dia)) +
   stat_slab(scale = 0.6, position = "dodge", slab_fill = "#b6dfe2", slab_colour = "#0A537D", alpha = 0.6) +
   stat_dotsinterval(side = "bottom", scale = 1, position = "dodge", slab_fill = NA, slab_colour = NA) +
   lims(x = c(0,5000),
@@ -502,8 +513,8 @@ cormat <-cormat[hc$order, hc$order]
 }
 
 data_clean %>%
-  select(length, max_dia, lmd, po_b, dia_10, dia_50, dia_100, dia_150, dia_200,
-         dia_250, dia_300, dia_800, dia_mid, mass) %>% 
+  select(length, max_dia, loc_max_dia, po_b, dia_10, dia_50, dia_100, dia_150, dia_200,
+         dia_250, dia_300, dia_800, dia_middle, mass) %>% 
   cor(use = "complete.obs") %>%
   round(2) %>%
   get_lower_tri() %>%
@@ -511,16 +522,17 @@ data_clean %>%
   ggplot(aes(Var1, Var2, fill = value)) +
   geom_tile(colour = "white") +
   geom_text(aes(Var1, Var2, label = value), family = "Roboto", color = "black", size = 3.5) +
-  labs(fill = NULL, caption = "<b>Abbreviations</b>: <b>dia_mid</b> (diameter at mid-point) | <b>dia_x</b> (diameter at X measurement) <b>po_b</b> (point of balance)<br> <b>lmd</b> (length at maximum diameter) | <b>max_dia</b> (maximum diameter)") + 
+  labs(fill = "Correlation Measure:", caption = "<b>Abbreviations</b>: <b>dia_mid</b> (diameter at mid-point) | <b>dia_x</b> (diameter at X measurement) <b>po_b</b> (point of balance)<br> <b>lmd</b> (length at maximum diameter) | <b>max_dia</b> (maximum diameter)") + 
   coord_fixed() +
   scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab")+
+                       midpoint = 0, limit = c(-1,1), space = "Lab") +
   theme_minimal() +
   theme(plot.margin = margin(10,10,10,10),
         text = element_text(family = "Roboto", size = 10),
         plot.background = element_rect(colour = "#FFFFFF"),
         plot.caption = element_markdown(size = 9, colour = "grey30", hjust = 0.5, margin = margin(20,0,0,0)),
         legend.position = "top",
+        legend.title = element_text(hjust = 0.5, margin = margin(b = 10)),
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.major = element_blank(),
@@ -533,14 +545,18 @@ data_clean %>%
 
 ```{r}
 
+data_clean_pca <- data_clean %>% 
+  na.omit() %>% 
+  select(-percent_loc_max_dia, -percent_po_b)
+
 data_recipe <- 
-  recipe(~., data = data_clean) %>%
-  update_role(museum_id, delivery, proposed_grouping, proposed_grouping_2, new_role = "id") %>% 
-  step_naomit(all_predictors()) %>% 
+  recipe(~., data = data_clean_pca) %>% 
+  update_role(museum_id, delivery, proposed_grouping, proposed_grouping_2, new_role = "id") %>%
   step_normalize(all_predictors()) %>%
-  step_pca(all_predictors(), id = "pca") %>% 
+  step_pca(all_predictors(), id = "pca", num_comp = 10) %>% 
   prep()
-  
+
+
 data_pca <- 
   data_recipe %>% 
   tidy(id = "pca") 
@@ -551,15 +567,13 @@ data_pca <-
 data_recipe %>% 
   tidy(id = "pca", type = "variance") %>% 
   filter(terms == "percent variance") %>%
-  filter(component < 8) 
-
-%>% 
+  filter(component < 11) %>% 
   ggplot(aes(x = component, y = value)) + 
   geom_col(fill = "#b6dfe2") + 
-  geom_text(aes(component, value + 1.5, label = scales::percent(round(value/100, 2))), family = "Roboto Black", color = "grey40", size = 4) +
+  geom_text(aes(component, value + 1.5, label = scales::percent(round(value/100, 3))), family = "Roboto Black", color = "grey40", size = 4) +
   xlab("Principal Component") +
   ylab("Variance (%)") +
-  scale_x_continuous(breaks = seq(0,8,1)) +
+  scale_x_continuous(breaks = seq(0,10,1)) +
   theme_minimal() +
     theme(text = element_text(family = "Roboto", size = 10),
           plot.margin = margin(10, 5, 10, 5),
@@ -571,6 +585,8 @@ data_recipe %>%
           panel.border = element_blank(),
           panel.background = element_blank(),
           axis.ticks = element_blank())
+
+ggsave("Figure_6.png", plot = last_plot(), dpi = 400, bg = "white", height = 20, width = 20, units = "cm")
 ```
 
 ```{r}
@@ -580,15 +596,17 @@ data_pca %>%
                                           abs(value), 
                                           component)) %>%
   group_by(component) %>%
-  top_n(abs(value), n = 8) %>%
-  filter(component %in% c("PC1", "PC2", "PC3", "PC4")) %>%
+  filter(component %in% c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10")) %>%
+  mutate(component = as.factor(component)) %>%
+  mutate(component = fct_relevel(component, "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10")) %>%
   ggplot(aes(abs(value), terms, fill = value > 0)) +
   geom_col() +
   facet_wrap(~component, scales = "free_y") +
   tidytext::scale_y_reordered() +
+  scale_x_continuous(breaks = seq(0,80,20)) +
   labs(
     x = "Contribution (%)",
-    y = "Variable (Top 8)", 
+    y = "Variable", 
     fill = "PCA Direction"
   ) +
   scale_fill_manual(values = c("#b6dfe2", "#0A537D"),
@@ -602,21 +620,22 @@ data_pca %>%
           axis.title.y = element_text(size = 11, margin = margin(0,10,0,0)),
           strip.text.x = element_text(size = 14, margin = margin(5,0,10,0)),
           axis.text = element_text(size = 10, colour = "grey40"),
-          panel.grid.major = element_blank(),
           panel.border = element_blank(),
           panel.background = element_blank(),
           axis.ticks = element_blank())
+
+ggsave("Figure_7.png", plot = last_plot(), dpi = 400, bg = "white", height = 30, width = 30, units = "cm")
 ```
 
 ```{r}
 a <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC1, PC2, colour = Delivery, shape = Delivery)) +
+  ggplot(aes(PC01, PC02, colour = Delivery, shape = Delivery)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 1 (44.6%)",
-       y = "Principal Component 2 (30.8%)") +
+  labs(x = "Principal Component 1 (50.9%)",
+       y = "Principal Component 2 (26.5%)") +
   scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -637,11 +656,11 @@ a <- data_recipe %>%
 b <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC2, PC3, colour = Delivery, shape = Delivery)) +
+  ggplot(aes(PC02, PC03, colour = Delivery, shape = Delivery)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 2 (30.8%)",
-       y = "Principal Component 3 (10.0%)") +
+  labs(x = "Principal Component 2 (26.5%)",
+       y = "Principal Component 3 (10.9%)") +
   scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -662,11 +681,11 @@ b <- data_recipe %>%
 c <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC1, PC2, colour = proposed_grouping, shape = proposed_grouping)) +
+  ggplot(aes(PC01, PC02, colour = proposed_grouping, shape = proposed_grouping)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 1 (44.6%)",
-       y = "Principal Component 2 (30.8%)") +
+  labs(x = "Principal Component 1 (50.9%)",
+       y = "Principal Component 2 (26.5%)") +
   scale_colour_manual(values = c("#b6dfe2","#0A537D")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -687,11 +706,11 @@ c <- data_recipe %>%
 d <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC2, PC3, colour = proposed_grouping, shape = proposed_grouping)) +
+  ggplot(aes(PC02, PC03, colour = proposed_grouping, shape = proposed_grouping)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 2 (30.8%)",
-       y = "Principal Component 3 (10.0%)") +
+  labs(x = "Principal Component 2 (26.5%)",
+       y = "Principal Component 3 (10.9%)") +
   scale_colour_manual(values = c("#b6dfe2","#0A537D")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -712,11 +731,11 @@ d <- data_recipe %>%
 e <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC1, PC2, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
+  ggplot(aes(PC01, PC02, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 1 (44.6%)",
-       y = "Principal Component 2 (30.8%)") +
+  labs(x = "Principal Component 1 (50.9%)",
+       y = "Principal Component 2 (26.5%)") +
   scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -737,11 +756,11 @@ e <- data_recipe %>%
 f <- data_recipe %>%
   juice() %>%
   dplyr::rename(Delivery = delivery) %>%
-  ggplot(aes(PC2, PC3, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
+  ggplot(aes(PC02, PC03, colour = proposed_grouping_2, shape = proposed_grouping_2)) +
   geom_point(alpha = 0.8, size = 2) +
   stat_ellipse(type = "norm") +
-  labs(x = "Principal Component 2 (30.8%)",
-       y = "Principal Component 3 (10.0%)") +
+  labs(x = "Principal Component 2 (26.5%)",
+       y = "Principal Component 3 (10.9%)") +
   scale_colour_manual(values = c("#0A537D", "#7d340a", "#b6dfe2")) +
   lims(x = c(-10,10),
        y = c(-10,10)) +
@@ -761,9 +780,16 @@ f <- data_recipe %>%
 
 a + b
 
+ggsave("Figure_8.png", plot = last_plot(), dpi = 400, bg = "white", height = 15, width = 25, units = "cm")
+
 c + d
 
+ggsave("Figure_9.png", plot = last_plot(), dpi = 400, bg = "white", height = 15, width = 25, units = "cm")
+
+
 e + f
+
+ggsave("Figure_10.png", plot = last_plot(), dpi = 400, bg = "white", height = 15, width = 25, units = "cm")
 
 ```
 
@@ -775,12 +801,12 @@ PCA_data <- data_recipe %>%
   select(-museum_id) 
 
 
-res.man <- manova(cbind(PC1, PC2, PC3, PC4, PC5) ~ Delivery, data = PCA_data)
+res.man <- manova(cbind(PC01, PC02, PC03, PC04, PC05, PC06, PC07, PC08, PC09, PC10) ~ Delivery, data = PCA_data)
 summary(res.man)
 
 summary.aov(res.man)
 
-res.man.2 <- manova(cbind(PC1, PC2, PC3, PC4, PC5) ~ proposed_grouping, data = PCA_data)
+res.man.2 <- manova(cbind(PC01, PC02, PC03, PC04, PC05, PC06, PC07, PC08, PC09, PC10) ~ proposed_grouping, data = PCA_data)
 summary(res.man.2)
 
 summary.aov(res.man.2)
